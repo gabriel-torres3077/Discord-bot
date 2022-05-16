@@ -4,6 +4,8 @@ from random import uniform, randint
 from datetime import datetime
 from discord.ext import commands, tasks
 from config import BOT_TOKEN, ADMIN_CHAT_ID, POKEMON_CHANNEL
+from botAddons import draw_image
+from music_bot import Music_bot
 
 # base bot config
 intents = discord.Intents().all()  # allow bot to see what each member is doing
@@ -13,16 +15,20 @@ POKEMON_API_URL = "https://pokeapi.co/api/v2/pokemon/"
 # random picture generator
 PICTURE_API_URL = 'https://picsum.photos'
 
+# Import music bot
+
+client.add_cog(Music_bot(client))
+
 
 # check latency
-@client.command()
+@client.command(name="ping", help="testa o ping do bot")
 async def ping(ctx):
     print('ping command used')
     await ctx.send(f'Pong! {round(client.latency * 1000)} ms')
 
 
 # get a random image based on size
-@client.command()
+@client.command(name="foto", help="gera uma imagem aleatória com base no tamanho indicado")
 async def foto(ctx, *args):
     print(args)
     msg = list(args)
@@ -37,7 +43,7 @@ async def foto(ctx, *args):
 
 
 # delete multiple messages on channel (administrator only)
-@client.command()
+@client.command(name="deletar", aliases=["del"], help="deleta a quantidade de mensagens indicada")
 @commands.has_permissions(administrator=True)
 async def deletar(ctx, limit: int):
     await ctx.channel.purge(limit=limit)
@@ -52,11 +58,11 @@ async def deletar_erro(ctx, erro):
 
 
 # check user activity
-@client.command()
+@client.command(name="atividade", help="informa a atividade atual do usuário")
 async def atividade(ctx, member: discord.Member):
     activ = member.activity
     if activ is None:
-        await ctx.send("Ta fazendo porra nenhuma")
+        await ctx.send("O usuário está ocioso")
     else:
         await ctx.send(activ.name)
 
@@ -83,8 +89,20 @@ async def capturar(ctx):
     await ctx.send(pokemon_object.name)
 
 
+# gets any image send by user and modify it to looks like a draw
+@client.command(name="desenhar", help="edita a foto enviada para parecer um desenho")
+async def desenhar(ctx):
+    if len(ctx.message.attachments) > 0:
+        attachment = ctx.message.attachments[0].url
+        print(attachment)
+    else:
+        ctx.send('por favor ensira uma imagem para mim tentar copiar')
+        return
+    await ctx.send(file=discord.File(draw_image(attachment)))
+
+
 # search a pokemon by ID, also creates a pokemon object to be captured if "build_pokemon" is True
-@client.command()
+@client.command(name="pokedex", help="busca pelo ID do pokemon indicado e retorna suas informações")
 async def pokedex(ctx, pokemon, build_pokemon=None, send_message=True):
     if build_pokemon is None:
         build_pokemon = False
@@ -119,7 +137,7 @@ async def pokedex(ctx, pokemon, build_pokemon=None, send_message=True):
             await ctx.send(embed=embed)
 
     except Exception:
-        await ctx.send( 'esse pokemon não existe, por favor tente um valor entre 1 e 898')
+        await ctx.send('esse pokemon não existe, por favor tente um valor entre 1 e 898')
 
 
 # on start bot function
@@ -127,8 +145,9 @@ async def pokedex(ctx, pokemon, build_pokemon=None, send_message=True):
 async def on_ready():
     print('Logged in as user {0.user}'.format(client))
     print('Current time: {}'.format(datetime.now().strftime("%H:%M:%S")))
-    pokemon_breeder.start()  # start pokemon auto exibit
-    pokemon_object = await pokedex(client.get_channel(POKEMON_CHANNEL), 1, True, False)
+    # pokemon_breeder.start()  # start pokemon auto exibit
+    pokemon_object = await pokedex(client.get_channel(POKEMON_CHANNEL), 1, True, False)  # create base pokemon object
+    current_music_ID = 1
 
 
 # detect when someone stars a game and mention it on the administrator chat channel
@@ -136,7 +155,7 @@ async def on_ready():
 async def on_member_update(prev, cur):  # get previous and current member state
     chat_channel = client.get_channel(ADMIN_CHAT_ID)
     games = ['overwatch', 'rocket league', 'minecraft', 'the last of us™ parte II',
-             'valorant', 'Tom Clancy\'s The Division 2']  # list of games that are being monitored
+             'Tom Clancy\'s The Division 2']  # list of games that are being monitored
     if cur.activity and cur.activity.name.lower() in games:
         activity = str(cur.activity.type)
         await chat_channel.send(f'{cur.mention} are {activity.lstrip("ActivityType=")} {cur.activity.name}')
